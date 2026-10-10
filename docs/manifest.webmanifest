@@ -1,0 +1,30 @@
+{
+ "name": "십자 셈놀이",
+ "short_name": "셈놀이",
+ "lang": "ko",
+ "description": "가로세로 식을 숫자 블록으로 채우는 사칙연산 퍼즐",
+ "start_url": "./",
+ "scope": "./",
+ "display": "standalone",
+ "orientation": "any",
+ "background_color": "#E8F1F8",
+ "theme_color": "#2A68D4",
+ "icons": [
+  {
+   "src": "icon-192.png",
+   "sizes": "192x192",
+   "type": "image/png"
+  },
+  {
+   "src": "icon-512.png",
+   "sizes": "512x512",
+   "type": "image/png"
+  },
+  {
+   "src": "icon-maskable-512.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "maskable"
+  }
+ ]
+}
