@@ -7,7 +7,7 @@
   --bg:#E8F1F8; --grid:#D4E3EF; --paper:#FFFFFF; --line:#C3D4E3; --line-strong:#8FA9C2;
   --ink:#1C2B45; --muted:#5B6E8A; --accent:#2A68D4; --accent-ink:#FFFFFF;
   --tile:#FFC83D; --tile-edge:#D99A00; --tile-ink:#3A2A00;
-  --ok:#23985B; --ok-bg:#D9F3E4; --bad:#D93A44; --bad-bg:#FDE1E2;
+  --ok:#23985B; --ok-bg:#D9F3E4; --lane:#D3E2F4; --lane-ok:#BFE8CF; --bad:#D93A44; --bad-bg:#FDE1E2;
   --d1:#2FA968; --d2:#2A68D4; --d3:#E9852B; --d4:#8A4FD6;
   --f-display:"Jua","Gowun Dodum",system-ui,sans-serif;
   --f-body:"Gowun Dodum",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
@@ -18,13 +18,13 @@
   --bg:#0F1828; --grid:#17233A; --paper:#1A273F; --line:#2B3B58; --line-strong:#4A6185;
   --ink:#EAF0FA; --muted:#93A4BF; --accent:#6EA0FF; --accent-ink:#0B1424;
   --tile:#F4BC35; --tile-edge:#AD7C00; --tile-ink:#2A1E00;
-  --ok:#4CC985; --ok-bg:#15392A; --bad:#FF6B73; --bad-bg:#3D1C24;
+  --ok:#4CC985; --ok-bg:#15392A; --lane:#26395C; --lane-ok:#1C4D36; --bad:#FF6B73; --bad-bg:#3D1C24;
   --d1:#4CC985; --d2:#6EA0FF; --d3:#F49B4B; --d4:#B086F0; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#0F1828; --grid:#17233A; --paper:#1A273F; --line:#2B3B58; --line-strong:#4A6185;
   --ink:#EAF0FA; --muted:#93A4BF; --accent:#6EA0FF; --accent-ink:#0B1424;
   --tile:#F4BC35; --tile-edge:#AD7C00; --tile-ink:#2A1E00;
-  --ok:#4CC985; --ok-bg:#15392A; --bad:#FF6B73; --bad-bg:#3D1C24;
+  --ok:#4CC985; --ok-bg:#15392A; --lane:#26395C; --lane-ok:#1C4D36; --bad:#FF6B73; --bad-bg:#3D1C24;
   --d1:#4CC985; --d2:#6EA0FF; --d3:#F49B4B; --d4:#B086F0; color-scheme:dark}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
@@ -98,15 +98,18 @@ h1,h2,h3{font-family:var(--f-display);font-weight:400;margin:0;text-wrap:balance
 .play{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;margin-top:14px}
 @media (min-width:860px){.play{grid-template-columns:minmax(0,1fr) 320px;align-items:start}}
 .board-wrap{background:var(--paper);border:1.5px solid var(--line);border-radius:20px;padding:14px;display:grid;place-items:center;min-width:0;overflow:hidden}
-.board{display:grid;gap:4px;--cs:44px}
+.board{display:grid;gap:4px;--cs:44px;position:relative}
+.lane{position:absolute;background:var(--lane);border-radius:calc(var(--cs)*.3);transition:background .25s}
+.lane.ok{background:var(--lane-ok)}
+.cell{z-index:1}
 .cell{width:var(--cs);height:var(--cs);display:grid;place-items:center;border-radius:calc(var(--cs)*.22);
   font-family:var(--f-num);font-weight:600;font-size:calc(var(--cs)*.46);font-variant-numeric:tabular-nums;user-select:none;position:relative}
 body.bigfont .cell{font-size:calc(var(--cs)*.56)}
 .cell.void{visibility:hidden}
-.cell.num{background:var(--bg);color:var(--ink)}
+.cell.num{background:var(--paper);color:var(--ink);box-shadow:0 2px 0 var(--line)}
 .cell.op{color:var(--accent);font-size:calc(var(--cs)*.56)}
 body.bigfont .cell.op{font-size:calc(var(--cs)*.64)}
-.cell.okeq.num{color:var(--ok);background:var(--ok-bg)}
+.cell.okeq.num{color:var(--ok)}
 .cell.okeq.op{color:var(--ok)}
 .cell.slot{border:2px dashed var(--line-strong);background:var(--paper);cursor:pointer}
 .cell.slot.filled{border:2px solid var(--tile-edge);border-bottom-width:4px;background:var(--tile);color:var(--tile-ink)}
@@ -431,7 +434,10 @@ function buildBoard(){
     else if(cell.type==='op')h+=`<div class="cell op" data-k="${k}">${cell.op==='='?'=':SHOW[cell.op]}</div>`;
     else if(P.blanks.includes(k))h+=`<div class="cell slot" data-k="${k}" role="button" tabindex="0" aria-label="빈칸"></div>`;
     else h+=`<div class="cell num" data-k="${k}">${cell.value}</div>`}
-  b.innerHTML=h;fit();
+  let h0='';const X=n=>`calc(var(--cs)*${n} + ${4*n-4}px)`;
+  P.eqs.forEach(e=>{const s=P.grid.get(e.cells[0]),x=s.c-c1,y=s.r-r1,hz=e.dir==='h',L=e.L;
+    h0+=`<div class="lane" data-e="${e.id}" style="left:${X(x)};top:${X(y)};width:calc(var(--cs)*${hz?L:1} + ${4*((hz?L:1)-1)+8}px);height:calc(var(--cs)*${hz?1:L} + ${4*((hz?1:L)-1)+8}px)"></div>`});
+  b.innerHTML=h0+h;fit();
 }
 function fit(){if(!S)return;const w=$('#boardWrap').clientWidth-30,{rows,cols}=S.puzzle.box,gap=4;
   const hMax=Math.max(260,window.innerHeight*(window.innerWidth>=860?.72:.55));
@@ -449,6 +455,7 @@ function refresh(){
       el.classList.toggle('ok',v!=null&&allOk);el.classList.toggle('bad',v!=null&&anyBad);el.classList.toggle('hinted',S.hinted.has(k));
       el.setAttribute('aria-label',v==null?'빈칸':'숫자 '+v)}
     else el.classList.toggle('okeq',allOk)});
+  document.querySelectorAll('#board .lane').forEach(el=>el.classList.toggle('ok',!blind&&st[+el.dataset.e]===true));
   const t=$('#tiles');t.innerHTML=S.tiles.map((x,i)=>`<button class="tile${x.at?' used':''}" data-i="${i}" ${x.at?'tabindex="-1" aria-hidden="true"':''}>${x.v}</button>`).join('');
   const left=S.tiles.filter(x=>!x.at).length;$('#left').textContent=left?`${left}개 남음`:'모두 놓았어요';
   $('#vMiss').textContent=S.mistakes;$('#pMiss').classList.toggle('bad',S.mistakes>0);$('#vTime').textContent=fmt(S.t);
