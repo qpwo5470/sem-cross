@@ -47,6 +47,13 @@ icon(180, True).convert("RGB").save(DOCS / "apple-touch-icon.png")
         {"src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}]
 }, ensure_ascii=False, indent=1))
 
+# ---------- fonts: subset to the characters this app actually uses (small + fully cacheable offline) ----------
+import re, urllib.parse
+OLD_FONT = re.search(r'<link rel="stylesheet" href="(https://fonts\.googleapis\.com/css2\?[^"]+)">', src).group(1)
+chars = "".join(sorted(set(c for c in src if not c.isspace() and ord(c) < 0x10000))) + "0123456789"
+FONT_URL = OLD_FONT.replace("&amp;", "&").replace("&display=swap", "") + "&text=" + urllib.parse.quote("".join(sorted(set(chars)))) + "&display=swap"
+src = src.replace(OLD_FONT, FONT_URL.replace("&", "&amp;"))
+
 # ---------- page ----------
 i = src.index("<style>"); title = src[:i]; rest = src[i:]
 j = rest.index("</style>") + len("</style>"); style, body = rest[:j], rest[j:]
@@ -67,7 +74,9 @@ head = f"""<!doctype html>
 <meta name="apple-mobile-web-app-title" content="셈놀이">
 """
 sw_reg = """<script>
-if('serviceWorker' in navigator&&location.protocol==='https:'){addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))}
+if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){addEventListener('load',()=>{
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+  navigator.serviceWorker.ready.then(()=>{if(!store.get('offlineReady',false)){store.set('offlineReady',true);setTimeout(()=>toast('이제 인터넷 없이도 할 수 있어요'),1500)}})})}
 </script>"""
 page = head + title + style + "\n</head>\n<body>" + body + "\n" + sw_reg + "\n</body>\n</html>\n"
 (DOCS / "index.html").write_text(page)
@@ -76,7 +85,11 @@ page = head + title + style + "\n</head>\n<body>" + body + "\n" + sw_reg + "\n</
 ver = hashlib.sha1(page.encode()).hexdigest()[:10]
 (DOCS / "sw.js").write_text(f"""const V='sem-{ver}';
 const SHELL=['./','index.html','manifest.webmanifest','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png'];
-self.addEventListener('install',e=>{{e.waitUntil(caches.open(V).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting()))}});
+const FONT={json.dumps(FONT_URL)};
+async function cacheFonts(c){{try{{const r=await fetch(FONT,{{mode:'cors'}});if(!r.ok)return;await c.put(FONT,r.clone());
+  const urls=[...(await r.text()).matchAll(/url\\((https:[^)]+)\\)/g)].map(m=>m[1]);
+  await Promise.all(urls.map(u=>fetch(u,{{mode:'cors'}}).then(x=>x.ok&&c.put(u,x)).catch(()=>{{}})))}}catch(e){{}}}}
+self.addEventListener('install',e=>{{e.waitUntil(caches.open(V).then(async c=>{{await c.addAll(SHELL);await cacheFonts(c)}}).then(()=>self.skipWaiting()))}});
 self.addEventListener('activate',e=>{{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==V).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))}});
 self.addEventListener('fetch',e=>{{
   const r=e.request; if(r.method!=='GET')return;
@@ -84,7 +97,7 @@ self.addEventListener('fetch',e=>{{
   if(r.mode==='navigate'){{ // 온라인이면 최신 버전, 오프라인이면 저장본
     e.respondWith(fetch(r).then(res=>{{caches.open(V).then(c=>c.put('index.html',res.clone()));return res}}).catch(()=>caches.match('index.html')));return}}
   if(u.origin===location.origin||/fonts\\.(googleapis|gstatic)\\.com$/.test(u.hostname)){{ // 저장본 먼저, 뒤에서 갱신
-    e.respondWith(caches.open(V).then(async c=>{{const hit=await c.match(r);
+    e.respondWith(caches.open(V).then(async c=>{{const hit=await c.match(r.url)||await c.match(r);
       const net=fetch(r).then(res=>{{if(res.ok||res.type==='opaque')c.put(r,res.clone());return res}}).catch(()=>hit);
       return hit||net}}))}}
 }});
